@@ -99,7 +99,7 @@ const db={
   async save(k,v){try{await fetch(`${SB_URL}/rest/v1/app_data`,{method:"POST",headers:{...SBH,Prefer:"resolution=merge-duplicates"},body:JSON.stringify({key:k,value:v,updated_at:new Date().toISOString()})})}catch{}}
 };
 
-function calcProjection(savings,cfg,customFixed,fixedAmts){
+function calcProjection(savings,cfg,customFixed,fixedAmts,customEvents){
   const now=new Date();const cm=MK();const months=mBtw(now,TARGET.date);
   const allFixed=[...PRESET_FIXED,...(customFixed||[])];
   let total=savings;
@@ -115,7 +115,8 @@ function calcProjection(savings,cfg,customFixed,fixedAmts){
       return s+f.amount;
     },0);
     const fixUSD=fixARS/cfg.dollarRate;
-    const extraARS=EXTRAS.filter(e=>e.month===mk).reduce((s,e)=>s+e.amount,0);
+    const monthEvents=[...EXTRAS.filter(e=>e.month===mk).map(e=>({...e,custom:false})),...((customEvents&&customEvents[mk])||[]).map(e=>({...e,custom:true}))];
+    const extraARS=monthEvents.reduce((s,e)=>s+e.amount,0);
     const extraUSD=extraARS/cfg.dollarRate;
     const saved=sal-fixUSD-250-extraUSD;
     const isBonus=d.getMonth()===11&&d.getFullYear()===2026;
@@ -123,7 +124,7 @@ function calcProjection(savings,cfg,customFixed,fixedAmts){
     total+=monthTotal;
     const hasMonotributo=mk>="2026-09";
     const hasRaise=d>=new Date(2027,1,1);
-    timeline.push({month:mk,label:`${MN[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,saved:Math.round(monthTotal),accumulated:Math.round(total),isBonus,hasExtra:extraARS>0,extraDesc:EXTRAS.filter(e=>e.month===mk).map(e=>e.desc).join(", "),hasMonotributo,hasRaise,fixedUSD:Math.round(fixUSD),extraUSD:Math.round(extraUSD)});
+    timeline.push({month:mk,label:`${MN[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,saved:Math.round(monthTotal),accumulated:Math.round(total),isBonus,hasExtra:extraARS!==0,extraDesc:monthEvents.map(e=>e.desc).join(", "),hasMonotributo,hasRaise,fixedUSD:Math.round(fixUSD),extraUSD:Math.round(extraUSD),events:monthEvents});
   }
   return{projected:Math.round(total),timeline};
 }
@@ -194,11 +195,13 @@ function App(){
   const[fixedAmts,setFixedAmts]=useState({});
   const[purchased,setPurchased]=useState({});
   const[customFixed,setCustomFixed]=useState([]);
+  const[customEvents,setCustomEvents]=useState({});
   const[toast,setToast]=useState(null);
   const[form,setForm]=useState({amount:"",cat:"general",desc:""});
   const[fixedOpen,setFixedOpen]=useState(false);
   const[addFixedOpen,setAddFixedOpen]=useState(false);
   const[newFixed,setNewFixed]=useState({name:"",amount:"",variable:false});
+  const[newEvent,setNewEvent]=useState({month:"",desc:"",amount:"",type:"gasto"});
 
   useEffect(()=>{(async()=>{
     const all=await db.load();
@@ -209,6 +212,7 @@ function App(){
     setFixedAmts(all["mtz-fixedamts"]||{});
     setPurchased(all["mtz-purchased"]||{});
     setCustomFixed(all["mtz-customfixed"]||[]);
+    setCustomEvents(all["mtz-customevents"]||{});
     setLoading(false);
   })()},[]);
 
@@ -219,6 +223,7 @@ function App(){
   const saveFixedAmts=sv("mtz-fixedamts",setFixedAmts);
   const savePurchased=sv("mtz-purchased",setPurchased);
   const saveCustomFixed=sv("mtz-customfixed",setCustomFixed);
+  const saveCustomEvents=sv("mtz-customevents",setCustomEvents);
   const saveCfg=async nc=>{setCfg(nc);await db.save("mtz-config",nc)};
 
   const cm=MK();const now=new Date();
@@ -233,7 +238,8 @@ function App(){
   const totalMonthARS=totalFixedARS+totalVarARS;
   const totalMonthUSD=totalMonthARS/cfg.dollarRate;
 
-  const{projected,timeline}=calcProjection(savings,cfg,customFixed,fixedAmts);
+  const{projected,timeline}=calcProjection(savings,cfg,customFixed,fixedAmts,customEvents);
+  const upcomingMonths=timeline.map(t=>({key:t.month,label:t.label}));
   const mood=getMood(projected,targetAmt);
   const surplus=projected-targetAmt;
   const remaining=targetAmt-savings;
@@ -262,6 +268,19 @@ function App(){
     setNewFixed({name:"",amount:"",variable:false});setAddFixedOpen(false);
   };
   const removeCustomFixed=async id=>{await saveCustomFixed(customFixed.filter(f=>f.id!==id))};
+  const addEvent=async()=>{
+    if(!newEvent.month||!newEvent.desc||!newEvent.amount)return;
+    const amt=parseFloat(newEvent.amount)*(newEvent.type==="ingreso"?-1:1);
+    const item={id:`ev-${Date.now()}`,desc:newEvent.desc,amount:amt};
+    const list=customEvents[newEvent.month]||[];
+    const updated={...customEvents,[newEvent.month]:[...list,item]};
+    await saveCustomEvents(updated);
+    setNewEvent({month:"",desc:"",amount:"",type:"gasto"});
+  };
+  const removeEvent=async(month,id)=>{
+    const updated={...customEvents,[month]:(customEvents[month]||[]).filter(e=>e.id!==id)};
+    await saveCustomEvents(updated);
+  };
 
   if(loading)return(
     <div className="flex items-center justify-center h-screen bg-gray-950 text-gray-300">
@@ -552,7 +571,82 @@ function App(){
     );
   };
 
-  const tabs=[{icon:"📊",label:"Dashboard"},{icon:"💸",label:"Gastos"},{icon:"📦",label:"Mudanza"}];
+  const renderEventos=()=>{
+    const monthsWithEvents=upcomingMonths.filter(m=>{
+      const preset=EXTRAS.filter(e=>e.month===m.key);
+      const custom=customEvents[m.key]||[];
+      return preset.length>0||custom.length>0;
+    });
+    return(
+      <div className="space-y-4 pb-24">
+        <Card>
+          <p className="text-gray-300 text-sm font-medium mb-1">📅 Eventos futuros</p>
+          <p className="text-gray-500 text-xs">Cargá gastos o ingresos que sabés que vienen — vacaciones, regalos, algo extra — y se reflejan directo en el dashboard.</p>
+        </Card>
+
+        <Card>
+          <p className="text-gray-300 text-sm font-medium mb-3">Agregar evento</p>
+          <div className="mb-2">
+            <label className="text-xs text-gray-500 mb-1 block">Mes</label>
+            <select value={newEvent.month} onChange={e=>setNewEvent(f=>({...f,month:e.target.value}))}
+              className="w-full bg-gray-800 text-white rounded-xl px-3 py-2.5 text-sm border-none outline-none appearance-none">
+              <option value="">Elegí un mes</option>
+              {upcomingMonths.map(m=><option key={m.key} value={m.key}>{m.label}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-2 mb-2">
+            {[["gasto","💸 Gasto"],["ingreso","💰 Ingreso extra"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setNewEvent(f=>({...f,type:v}))}
+                className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${newEvent.type===v?"bg-indigo-600 text-white":"bg-gray-800 text-gray-400"}`}>{l}</button>
+            ))}
+          </div>
+          <input type="text" placeholder="Descripción (ej: Vacaciones)" value={newEvent.desc}
+            onChange={e=>setNewEvent(f=>({...f,desc:e.target.value}))}
+            className="w-full bg-gray-800 text-white rounded-xl px-3 py-2.5 mb-2 text-sm placeholder-gray-600 border-none outline-none"/>
+          <input type="number" inputMode="numeric" placeholder="Monto (ARS)" value={newEvent.amount}
+            onChange={e=>setNewEvent(f=>({...f,amount:e.target.value}))}
+            className="w-full bg-gray-800 text-white rounded-xl px-3 py-2.5 mb-3 text-sm placeholder-gray-600 border-none outline-none"/>
+          <button onClick={addEvent}
+            className="w-full bg-indigo-600 active:bg-indigo-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+            Agregar evento
+          </button>
+        </Card>
+
+        {monthsWithEvents.length>0&&(
+          <Card>
+            <p className="text-gray-400 text-sm font-medium mb-3">Eventos cargados</p>
+            {monthsWithEvents.map(m=>{
+              const preset=EXTRAS.filter(e=>e.month===m.key);
+              const custom=customEvents[m.key]||[];
+              return(
+                <div key={m.key} className="mb-3 last:mb-0 pb-3 last:pb-0 border-b border-gray-800 last:border-0">
+                  <p className="text-gray-300 text-sm font-medium mb-1.5">{m.label}</p>
+                  {preset.map((e,i)=>(
+                    <div key={`p-${i}`} className="flex items-center justify-between py-1">
+                      <span className="text-gray-500 text-sm">🔒 {e.desc}</span>
+                      <span className="text-gray-400 text-sm">{fA(e.amount)}</span>
+                    </div>
+                  ))}
+                  {custom.map(e=>(
+                    <div key={e.id} className="flex items-center justify-between py-1">
+                      <span className={`text-sm ${e.amount<0?"text-green-400":"text-gray-300"}`}>{e.amount<0?"💰":"💸"} {e.desc}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm ${e.amount<0?"text-green-400":"text-gray-300"}`}>{e.amount<0?"+":""}{fA(Math.abs(e.amount))}</span>
+                        <button onClick={()=>removeEvent(m.key,e.id)} className="text-gray-600 active:text-red-400 p-1 text-xs">✕</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+            <p className="text-gray-600 text-xs mt-2">🔒 = evento fijo que ya conocíamos</p>
+          </Card>
+        )}
+      </div>
+    );
+  };
+
+  const tabs=[{icon:"📊",label:"Dashboard"},{icon:"💸",label:"Gastos"},{icon:"📦",label:"Mudanza"},{icon:"📅",label:"Eventos"}];
 
   return(
     <div className="min-h-screen bg-gray-950 text-white max-w-lg mx-auto">
@@ -566,13 +660,14 @@ function App(){
         {tab===0&&renderDashboard()}
         {tab===1&&renderGastos()}
         {tab===2&&renderMudanza()}
+        {tab===3&&renderEventos()}
       </div>
       <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 z-30">
         <div className="flex max-w-lg mx-auto">
           {tabs.map((t,i)=>(
             <button key={i} onClick={()=>setTab(i)}
-              className={`flex-1 py-3 flex flex-col items-center gap-0.5 transition-all ${tab===i?"text-indigo-400":"text-gray-500"}`}>
-              <span className="text-xl">{t.icon}</span><span className="text-xs">{t.label}</span>
+              className={`flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-all ${tab===i?"text-indigo-400":"text-gray-500"}`}>
+              <span className="text-lg">{t.icon}</span><span className="text-[10px]">{t.label}</span>
             </button>
           ))}
         </div>
