@@ -8,569 +8,543 @@
 <meta name="apple-mobile-web-app-title" content="Mudanza 2027">
 <meta name="theme-color" content="#030712">
 <title>Mudanza 2027</title>
-<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiTXVkYW56YSAyMDI3Iiwic2hvcnRfbmFtZSI6Ik11ZGFuemEiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzAzMDcxMiIsInRoZW1lX2NvbG9yIjoiIzAzMDcxMiJ9">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.9/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<script>tailwind.config={theme:{extend:{}},darkMode:'class'}</script>
 <style>
-  * { -webkit-tap-highlight-color: transparent; }
-  body { margin:0; background:#030712; overscroll-behavior:none; }
-  input[type=number]::-webkit-inner-spin-button,
-  input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
-  input[type=number] { -moz-appearance:textfield; }
+  *{-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:#030712;overscroll-behavior:none;font-family:system-ui,-apple-system,sans-serif}
+  input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  input[type=number]{-moz-appearance:textfield}
+  @keyframes glow{0%,100%{filter:drop-shadow(0 0 15px var(--gc))}50%{filter:drop-shadow(0 0 30px var(--gc))}}
+  .emoji-glow{animation:glow 3s ease-in-out infinite}
+  @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+  .slide-up{animation:slideUp 0.2s ease-out}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect } = React;
+const{useState,useEffect,useCallback,useRef}=React;
 
-const TARGET = { date: new Date(2027, 3, 1), label: "Abril 2027" };
-const DEFAULTS = { savings: 2100, salary: 1400, dollarRate: 1550, endYearBonus: 1400, febRaise: 120, targetAmount: 7704 };
+const TARGET={date:new Date(2027,3,1)};
+const DEFAULTS={savings:2100,salary:1400,dollarRate:1550,endYearBonus:1400,febRaise:120,targetAmount:7704,currentMonthSavings:0};
 
-const FIXED_EXP = [
-  { id: "seguro-moto", name: "Seguro moto", amount: 74650, variable: false },
-  { id: "crunchyroll", name: "Crunchyroll", amount: 9500, variable: false },
-  { id: "google-one", name: "Google One", amount: 4600, variable: false },
-  { id: "apple-cloud", name: "Apple Cloud", amount: 5900, variable: false },
-  { id: "gastos-casa", name: "Gastos casa", amount: 135000, variable: true },
-  { id: "monotributo", name: "Monotributo", amount: 140000, variable: false, start: "2026-09" },
-  { id: "nafta", name: "Nafta", amount: 20000, variable: false },
+const PRESET_FIXED=[
+  {id:"seguro-moto",name:"Seguro moto",amount:74650,variable:false},
+  {id:"crunchyroll",name:"Crunchyroll",amount:9500,variable:false},
+  {id:"google-one",name:"Google One",amount:4600,variable:false},
+  {id:"apple-cloud",name:"Apple Cloud",amount:5900,variable:false},
+  {id:"gastos-casa",name:"Gastos casa",amount:135000,variable:true},
+  {id:"monotributo",name:"Monotributo",amount:140000,variable:false,start:"2026-09"},
+  {id:"nafta",name:"Nafta",amount:20000,variable:false},
 ];
 
-const EXTRAS = [
-  { month: "2026-09", desc: "Regalo", amount: 100000 },
-  { month: "2026-10", desc: "Aniversario 3 años", amount: 150000 },
-  { month: "2026-11", desc: "Regalos (cumple + mamá)", amount: 340000 },
+const EXTRAS=[
+  {month:"2026-09",desc:"Regalo",amount:100000},
+  {month:"2026-10",desc:"Aniversario",amount:150000},
+  {month:"2026-11",desc:"Regalos",amount:340000},
 ];
 
-const MOVE_ITEMS = [
-  { id:"heladera",name:"Heladera",cost:580,room:"Cocina",p:"indispensable"},
-  { id:"silla-x4",name:"Silla x4",cost:345,room:"Cocina",p:"ultimo"},
-  { id:"copa-x2",name:"Copa x2",cost:10,room:"Cocina",p:"noind"},
-  { id:"tupper-x4",name:"Tupper x4",cost:35,room:"Cocina",p:"noind"},
-  { id:"cacerola",name:"Cacerola grande",cost:40,room:"Cocina",p:"indispensable"},
-  { id:"sarten-g",name:"Sartén grande",cost:107,room:"Cocina",p:"indispensable"},
-  { id:"sarten-ch",name:"Sartén chica",cost:82,room:"Cocina",p:"indispensable"},
-  { id:"colador",name:"Colador",cost:10,room:"Cocina",p:"noind"},
-  { id:"tacho-c",name:"Tacho basura",cost:60,room:"Cocina",p:"indispensable"},
-  { id:"tabla",name:"Tabla cortar",cost:40,room:"Cocina",p:"indispensable"},
-  { id:"especiero",name:"Especiero",cost:30,room:"Cocina",p:"noind"},
-  { id:"lampara-m",name:"Lámpara mesa",cost:140,room:"Cocina",p:"noind"},
-  { id:"sillon",name:"Sillón grande",cost:1000,room:"Living",p:"ultimo"},
-  { id:"tv",name:"Televisor",cost:600,room:"Living",p:"ultimo"},
-  { id:"mesa-rat",name:"Mesa ratona",cost:210,room:"Living",p:"noind"},
-  { id:"lamp-ind",name:"Lámpara indirecta x3",cost:75,room:"Living",p:"noind"},
-  { id:"alfombra-l",name:"Alfombra living",cost:150,room:"Living",p:"noind"},
-  { id:"mesa-com",name:"Mesa comedor",cost:655,room:"Living",p:"ultimo"},
-  { id:"rack",name:"Rack",cost:550,room:"Living",p:"ultimo"},
-  { id:"plantas",name:"Plantas x2",cost:95,room:"Cuarto",p:"noind"},
-  { id:"alfombra-cu",name:"Alfombra cuarto",cost:200,room:"Cuarto",p:"noind"},
-  { id:"lavarropas",name:"Lavarropas",cost:340,room:"Baño/Extras",p:"indispensable"},
-  { id:"tender",name:"Tender",cost:25,room:"Baño/Extras",p:"indispensable"},
-  { id:"cuadros",name:"Cuadros x6",cost:175,room:"Baño/Extras",p:"noind"},
-  { id:"tacho-b",name:"Tacho basura baño",cost:60,room:"Baño/Extras",p:"indispensable"},
-  { id:"alfombra-d",name:"Alfombra ducha",cost:60,room:"Baño/Extras",p:"indispensable"},
-  { id:"toallas",name:"Toallas/toallones",cost:70,room:"Baño/Extras",p:"indispensable"},
-  { id:"escoba",name:"Escoba y pala",cost:20,room:"Baño/Extras",p:"indispensable"},
-  { id:"seg-caucion",name:"Seguro de caución",cost:850,room:"Inmobiliaria",p:"inmobiliaria"},
-  { id:"deposito",name:"Depósito",cost:700,room:"Inmobiliaria",p:"inmobiliaria"},
-  { id:"honorarios",name:"Honorarios inmobiliaria",cost:700,room:"Inmobiliaria",p:"inmobiliaria"},
-  { id:"adelanto",name:"Adelanto",cost:700,room:"Inmobiliaria",p:"inmobiliaria"},
+const MOVE_ITEMS=[
+  {id:"heladera",name:"Heladera",cost:580,room:"Cocina",p:"indispensable"},
+  {id:"silla-x4",name:"Silla x4",cost:345,room:"Cocina",p:"ultimo"},
+  {id:"copa-x2",name:"Copa x2",cost:10,room:"Cocina",p:"noind"},
+  {id:"tupper-x4",name:"Tupper x4",cost:35,room:"Cocina",p:"noind"},
+  {id:"cacerola",name:"Cacerola grande",cost:40,room:"Cocina",p:"indispensable"},
+  {id:"sarten-g",name:"Sartén grande",cost:107,room:"Cocina",p:"indispensable"},
+  {id:"sarten-ch",name:"Sartén chica",cost:82,room:"Cocina",p:"indispensable"},
+  {id:"colador",name:"Colador",cost:10,room:"Cocina",p:"noind"},
+  {id:"tacho-c",name:"Tacho basura",cost:60,room:"Cocina",p:"indispensable"},
+  {id:"tabla",name:"Tabla cortar",cost:40,room:"Cocina",p:"indispensable"},
+  {id:"especiero",name:"Especiero",cost:30,room:"Cocina",p:"noind"},
+  {id:"lampara-m",name:"Lámpara mesa",cost:140,room:"Cocina",p:"noind"},
+  {id:"sillon",name:"Sillón grande",cost:1000,room:"Living",p:"ultimo"},
+  {id:"tv",name:"Televisor",cost:600,room:"Living",p:"ultimo"},
+  {id:"mesa-rat",name:"Mesa ratona",cost:210,room:"Living",p:"noind"},
+  {id:"lamp-ind",name:"Lámpara indirecta x3",cost:75,room:"Living",p:"noind"},
+  {id:"alfombra-l",name:"Alfombra living",cost:150,room:"Living",p:"noind"},
+  {id:"mesa-com",name:"Mesa comedor",cost:655,room:"Living",p:"ultimo"},
+  {id:"rack",name:"Rack",cost:550,room:"Living",p:"ultimo"},
+  {id:"plantas",name:"Plantas x2",cost:95,room:"Cuarto",p:"noind"},
+  {id:"alfombra-cu",name:"Alfombra cuarto",cost:200,room:"Cuarto",p:"noind"},
+  {id:"lavarropas",name:"Lavarropas",cost:340,room:"Baño/Extras",p:"indispensable"},
+  {id:"tender",name:"Tender",cost:25,room:"Baño/Extras",p:"indispensable"},
+  {id:"cuadros",name:"Cuadros x6",cost:175,room:"Baño/Extras",p:"noind"},
+  {id:"tacho-b",name:"Tacho basura baño",cost:60,room:"Baño/Extras",p:"indispensable"},
+  {id:"alfombra-d",name:"Alfombra ducha",cost:60,room:"Baño/Extras",p:"indispensable"},
+  {id:"toallas",name:"Toallas/toallones",cost:70,room:"Baño/Extras",p:"indispensable"},
+  {id:"escoba",name:"Escoba y pala",cost:20,room:"Baño/Extras",p:"indispensable"},
+  {id:"seg-caucion",name:"Seguro de caución",cost:850,room:"Inmobiliaria",p:"inmobiliaria"},
+  {id:"deposito",name:"Depósito",cost:700,room:"Inmobiliaria",p:"inmobiliaria"},
+  {id:"honorarios",name:"Honorarios inmobiliaria",cost:700,room:"Inmobiliaria",p:"inmobiliaria"},
+  {id:"adelanto",name:"Adelanto",cost:700,room:"Inmobiliaria",p:"inmobiliaria"},
 ];
 
-const MK = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-const MONTH_NAMES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-const fmtUSD = n => `$${n.toLocaleString("es-AR",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
-const fmtARS = n => `$${n.toLocaleString("es-AR")}`;
-const monthsBetween = (a,b) => (b.getFullYear()-a.getFullYear())*12+b.getMonth()-a.getMonth();
-const PRIORITY_LABELS = {indispensable:"🟠 Indispensable",ultimo:"🟧 Último momento",noind:"🟢 No indispensable",inmobiliaria:"🔴 Inmobiliaria"};
-const PRIORITY_ORDER = ["indispensable","ultimo","inmobiliaria","noind"];
+const MK=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+const MN=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const fU=n=>`$${Math.round(n).toLocaleString("es-AR")}`;
+const fA=n=>`$${Math.round(n).toLocaleString("es-AR")}`;
+const mBtw=(a,b)=>(b.getFullYear()-a.getFullYear())*12+b.getMonth()-a.getMonth();
+const PL={indispensable:"🟠 Indispensable",ultimo:"🟧 Último momento",noind:"🟢 No indispensable",inmobiliaria:"🔴 Inmobiliaria"};
+const PO=["indispensable","ultimo","inmobiliaria","noind"];
 
-const SB_URL = "https://tuofgimokqkcjbljacsh.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1b2ZnaW1va3FrY2pibGphY3NoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNjQ5NjAsImV4cCI6MjEwMjc0MDk2MH0.95W6Yp-HwkEMOZSSib6W9khQrxzcl5EWZUKtpGKBuI4";
-const SB_HEADERS = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
+const SB_URL="https://tuofgimokqkcjbljacsh.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1b2ZnaW1va3FrY2pibGphY3NoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNjQ5NjAsImV4cCI6MjEwMjc0MDk2MH0.95W6Yp-HwkEMOZSSib6W9khQrxzcl5EWZUKtpGKBuI4";
+const SBH={apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,"Content-Type":"application/json"};
 
-const storage = {
-  async getAll() {
-    try {
-      const res = await fetch(`${SB_URL}/rest/v1/app_data?select=key,value`, { headers: SB_HEADERS });
-      if (!res.ok) throw new Error(res.statusText);
-      const rows = await res.json();
-      const map = {};
-      rows.forEach(r => { map[r.key] = r.value; });
-      return map;
-    } catch { return {}; }
-  },
-  async set(k, v) {
-    try {
-      await fetch(`${SB_URL}/rest/v1/app_data`, {
-        method: "POST",
-        headers: { ...SB_HEADERS, Prefer: "resolution=merge-duplicates" },
-        body: JSON.stringify({ key: k, value: v, updated_at: new Date().toISOString() })
-      });
-    } catch {}
-  }
+const db={
+  async load(){try{const r=await fetch(`${SB_URL}/rest/v1/app_data?select=key,value`,{headers:SBH});if(!r.ok)throw 0;const d=await r.json();const m={};d.forEach(r=>{m[r.key]=r.value});return m}catch{return{}}},
+  async save(k,v){try{await fetch(`${SB_URL}/rest/v1/app_data`,{method:"POST",headers:{...SBH,Prefer:"resolution=merge-duplicates"},body:JSON.stringify({key:k,value:v,updated_at:new Date().toISOString()})})}catch{}}
 };
 
-function getProjection(savings, config, fixedUSD, monthsData) {
-  const now = new Date();
-  const months = monthsBetween(now, TARGET.date);
-  let total = savings;
-  for (let i = 1; i <= months; i++) {
-    const m = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const mk = MK(m);
-    const actual = monthsData[mk];
-    if (actual && actual.closed) {
-      total += actual.savedUSD || 0;
-    } else {
-      let sal = config.salary;
-      if (m >= new Date(2027, 1, 1)) sal += config.febRaise;
-      const hasMonotributo = mk >= "2026-09";
-      const fixedTotal = hasMonotributo ? fixedUSD : fixedUSD - (140000 / config.dollarRate);
-      const extraThisMonth = EXTRAS.filter(e => e.month === mk).reduce((s,e) => s + e.amount, 0);
-      total += sal - fixedTotal - 250 - (extraThisMonth / config.dollarRate);
-      if (m.getMonth() === 11 && m.getFullYear() === 2026) total += config.endYearBonus;
-    }
+function calcProjection(savings,cfg,customFixed,fixedAmts){
+  const now=new Date();const cm=MK();const months=mBtw(now,TARGET.date);
+  const allFixed=[...PRESET_FIXED,...(customFixed||[])];
+  let total=savings;
+  const timeline=[];
+  for(let i=1;i<=months;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()+i,1);
+    const mk=MK(d);
+    let sal=cfg.salary;
+    if(d>=new Date(2027,1,1))sal+=cfg.febRaise;
+    const activeF=allFixed.filter(f=>!f.start||mk>=f.start);
+    const fixARS=activeF.reduce((s,f)=>{
+      if(f.variable)return s+(fixedAmts[mk]?.[f.id]??f.amount);
+      return s+f.amount;
+    },0);
+    const fixUSD=fixARS/cfg.dollarRate;
+    const extraARS=EXTRAS.filter(e=>e.month===mk).reduce((s,e)=>s+e.amount,0);
+    const extraUSD=extraARS/cfg.dollarRate;
+    const saved=sal-fixUSD-250-extraUSD;
+    const isBonus=d.getMonth()===11&&d.getFullYear()===2026;
+    const monthTotal=saved+(isBonus?cfg.endYearBonus:0);
+    total+=monthTotal;
+    const hasMonotributo=mk>="2026-09";
+    const hasRaise=d>=new Date(2027,1,1);
+    timeline.push({month:mk,label:`${MN[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`,saved:Math.round(monthTotal),accumulated:Math.round(total),isBonus,hasExtra:extraARS>0,extraDesc:EXTRAS.filter(e=>e.month===mk).map(e=>e.desc).join(", "),hasMonotributo,hasRaise,fixedUSD:Math.round(fixUSD),extraUSD:Math.round(extraUSD)});
   }
-  return Math.round(total);
+  return{projected:Math.round(total),timeline};
 }
 
-function getMood(projected, target) {
-  const r = projected / target;
-  if (r >= 1.20) return { emoji: "😎", text: "Vas sobrado, podés darte algún gusto", color: "#4ade80", bg: "#052e16", level: 5 };
-  if (r >= 1.05) return { emoji: "😊", text: "Bien encaminado, no aflojes", color: "#86efac", bg: "#052e16", level: 4 };
-  if (r >= 0.95) return { emoji: "😐", text: "Vas justo, cada gasto cuenta", color: "#fbbf24", bg: "#422006", level: 3 };
-  if (r >= 0.85) return { emoji: "😟", text: "Estás apretado, recortá lo que puedas", color: "#fb923c", bg: "#431407", level: 2 };
-  return { emoji: "😡", text: "Así no llegás a abril, hay que frenar", color: "#ef4444", bg: "#450a0a", level: 1 };
+function getMood(projected,target){
+  const r=projected/target;
+  if(r>=1.20)return{emoji:"😎",text:"Vas sobrado, podés darte algún gusto",color:"#4ade80",bg:"#052e16",level:5};
+  if(r>=1.05)return{emoji:"😊",text:"Bien encaminado, no aflojes",color:"#86efac",bg:"#052e16",level:4};
+  if(r>=0.95)return{emoji:"😐",text:"Vas justo, cada gasto cuenta",color:"#fbbf24",bg:"#422006",level:3};
+  if(r>=0.85)return{emoji:"😟",text:"Estás apretado, recortá lo que puedas",color:"#fb923c",bg:"#431407",level:2};
+  return{emoji:"😡",text:"Así no llegás a abril, hay que frenar",color:"#ef4444",bg:"#450a0a",level:1};
 }
 
-function getTip(mood, thisMonthTotal, category) {
-  if (category === "uber") {
-    if (mood.level <= 1) return "🚫 Cada uber te aleja de abril. ¿Podés usar la moto?";
-    if (mood.level <= 3) return "🏍️ Los ubers suman rápido. Priorizá la moto.";
-    return "✅ Anotado. Todavía tenés margen.";
+function getTip(mood,cat){
+  if(cat==="uber"){
+    if(mood.level<=1)return"🚫 Cada uber te aleja de abril. ¿Podés usar la moto?";
+    if(mood.level<=3)return"🏍️ Los ubers suman. Priorizá la moto.";
+    return"✅ Anotado, tenés margen.";
   }
-  if (mood.level <= 1) return "⚠️ Estás gastando demasiado. Frená todo lo que puedas.";
-  if (mood.level <= 3) return "📉 Este gasto aprieta. ¿Era necesario?";
-  return "✅ Registrado.";
+  if(mood.level<=1)return"⚠️ Frená todo lo que puedas.";
+  if(mood.level<=3)return"📉 ¿Era necesario?";
+  return"✅ Registrado.";
 }
 
-function App() {
-  const [tab, setTab] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [config, setConfig] = useState({ ...DEFAULTS });
-  const [savings, setSavings] = useState(DEFAULTS.savings);
-  const [expenses, setExpenses] = useState({});
-  const [fixedPaid, setFixedPaid] = useState({});
-  const [fixedAmts, setFixedAmts] = useState({});
-  const [purchased, setPurchased] = useState({});
-  const [monthsData, setMonthsData] = useState({});
-  const [toast, setToast] = useState(null);
-  const [form, setForm] = useState({ amount: "", cat: "general", desc: "" });
-  const [fixedOpen, setFixedOpen] = useState(false);
-  const [editSavings, setEditSavings] = useState(false);
-  const [savingsInput, setSavingsInput] = useState("");
-  const [editRate, setEditRate] = useState(false);
-  const [rateInput, setRateInput] = useState("");
-  const [editTarget, setEditTarget] = useState(false);
-  const [targetInput, setTargetInput] = useState("");
+// Editable value component - modern tap-to-edit
+function Val({value,onSave,label,format,prefix="",suffix="",size="xl"}){
+  const[editing,setEditing]=useState(false);
+  const[input,setInput]=useState("");
+  const ref=useRef();
+  const doSave=()=>{const v=parseFloat(input);if(v>=0&&!isNaN(v)){onSave(v)}setEditing(false)};
+  useEffect(()=>{if(editing&&ref.current)ref.current.focus()},[editing]);
+  if(editing)return(
+    <div className="slide-up">
+      {label&&<p className="text-xs text-gray-500 mb-1">{label}</p>}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 relative">
+          {prefix&&<span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{prefix}</span>}
+          <input ref={ref} type="number" inputMode="decimal" value={input}
+            onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")doSave()}}
+            className={`w-full bg-gray-800 border-2 border-indigo-500 rounded-xl ${prefix?"pl-7":"pl-3"} pr-3 py-2.5 text-white text-${size} font-bold outline-none`}/>
+        </div>
+        <button onClick={doSave} className="bg-indigo-600 active:bg-indigo-500 text-white px-4 py-2.5 rounded-xl font-medium text-sm shrink-0">OK</button>
+        <button onClick={()=>setEditing(false)} className="text-gray-500 px-2 py-2.5 text-sm">✕</button>
+      </div>
+    </div>
+  );
+  const display=format?format(value):`${prefix}${value.toLocaleString("es-AR")}${suffix}`;
+  return(
+    <div onClick={()=>{setInput(String(value));setEditing(true)}}
+      className="cursor-pointer group transition-all active:scale-[0.98]">
+      {label&&<p className="text-xs text-gray-500 mb-0.5">{label}</p>}
+      <p className={`text-${size} font-bold text-white group-active:text-indigo-400 transition-colors`}>{display}</p>
+    </div>
+  );
+}
 
-  useEffect(() => {
-    (async () => {
-      const all = await storage.getAll();
-      setConfig(all["mtz-config"] || DEFAULTS);
-      setSavings(all["mtz-savings"] ?? DEFAULTS.savings);
-      setExpenses(all["mtz-expenses"] || {});
-      setFixedPaid(all["mtz-fixedpaid"] || {});
-      setFixedAmts(all["mtz-fixedamts"] || {});
-      setPurchased(all["mtz-purchased"] || {});
-      setMonthsData(all["mtz-monthsdata"] || {});
-      setLoading(false);
-    })();
-  }, []);
+function Card({children,className="",style}){
+  return <div className={`bg-gray-900 rounded-2xl p-4 ${className}`} style={style}>{children}</div>;
+}
 
-  const save = (key, setter) => async (val) => { setter(val); await storage.set(key, val); };
-  const saveSavings = save("mtz-savings", setSavings);
-  const saveExpenses = save("mtz-expenses", setExpenses);
-  const saveFixedPaid = save("mtz-fixedpaid", setFixedPaid);
-  const saveFixedAmts = save("mtz-fixedamts", setFixedAmts);
-  const savePurchased = save("mtz-purchased", setPurchased);
-  const saveConfig = async (nc) => { setConfig(nc); await storage.set("mtz-config", nc); };
+function App(){
+  const[tab,setTab]=useState(0);
+  const[loading,setLoading]=useState(true);
+  const[cfg,setCfg]=useState({...DEFAULTS});
+  const[savings,setSavings]=useState(DEFAULTS.savings);
+  const[expenses,setExpenses]=useState({});
+  const[fixedPaid,setFixedPaid]=useState({});
+  const[fixedAmts,setFixedAmts]=useState({});
+  const[purchased,setPurchased]=useState({});
+  const[customFixed,setCustomFixed]=useState([]);
+  const[toast,setToast]=useState(null);
+  const[form,setForm]=useState({amount:"",cat:"general",desc:""});
+  const[fixedOpen,setFixedOpen]=useState(false);
+  const[addFixedOpen,setAddFixedOpen]=useState(false);
+  const[newFixed,setNewFixed]=useState({name:"",amount:"",variable:false});
 
-  const cm = MK();
-  const cmExpenses = expenses[cm] || [];
-  const now = new Date();
-  const monthsLeft = monthsBetween(now, TARGET.date);
-  const targetAmt = config.targetAmount || DEFAULTS.targetAmount;
+  useEffect(()=>{(async()=>{
+    const all=await db.load();
+    setCfg(all["mtz-config"]||DEFAULTS);
+    setSavings(all["mtz-savings"]??DEFAULTS.savings);
+    setExpenses(all["mtz-expenses"]||{});
+    setFixedPaid(all["mtz-fixedpaid"]||{});
+    setFixedAmts(all["mtz-fixedamts"]||{});
+    setPurchased(all["mtz-purchased"]||{});
+    setCustomFixed(all["mtz-customfixed"]||[]);
+    setLoading(false);
+  })()},[]);
 
-  const activeFixed = FIXED_EXP.filter(f => !f.start || cm >= f.start);
-  const totalFixedARS = activeFixed.reduce((s, f) => {
-    if (f.variable) return s + (fixedAmts[cm]?.[f.id] ?? f.amount);
-    return s + f.amount;
-  }, 0);
-  const totalFixedUSD = totalFixedARS / config.dollarRate;
-  const totalVarARS = cmExpenses.reduce((s, e) => s + e.amount, 0);
-  const totalVarUSD = totalVarARS / config.dollarRate;
-  const totalMonthARS = totalFixedARS + totalVarARS;
-  const totalMonthUSD = totalMonthARS / config.dollarRate;
+  const sv=useCallback((k,setter)=>async v=>{setter(v);await db.save(k,v)},[]);
+  const saveSavings=sv("mtz-savings",setSavings);
+  const saveExpenses=sv("mtz-expenses",setExpenses);
+  const saveFixedPaid=sv("mtz-fixedpaid",setFixedPaid);
+  const saveFixedAmts=sv("mtz-fixedamts",setFixedAmts);
+  const savePurchased=sv("mtz-purchased",setPurchased);
+  const saveCustomFixed=sv("mtz-customfixed",setCustomFixed);
+  const saveCfg=async nc=>{setCfg(nc);await db.save("mtz-config",nc)};
 
-  const projected = getProjection(savings, config, totalFixedUSD, monthsData);
-  const mood = getMood(projected, targetAmt);
-  const surplus = projected - targetAmt;
+  const cm=MK();const now=new Date();
+  const monthsLeft=mBtw(now,TARGET.date);
+  const targetAmt=cfg.targetAmount||DEFAULTS.targetAmount;
+  const cmExp=expenses[cm]||[];
+  const allFixed=[...PRESET_FIXED,...customFixed];
+  const activeFixed=allFixed.filter(f=>!f.start||cm>=f.start);
+  const totalFixedARS=activeFixed.reduce((s,f)=>f.variable?s+(fixedAmts[cm]?.[f.id]??f.amount):s+f.amount,0);
+  const totalFixedUSD=totalFixedARS/cfg.dollarRate;
+  const totalVarARS=cmExp.reduce((s,e)=>s+e.amount,0);
+  const totalMonthARS=totalFixedARS+totalVarARS;
+  const totalMonthUSD=totalMonthARS/cfg.dollarRate;
 
-  const remainingItemsCost = MOVE_ITEMS.filter(i => !purchased[i.id]).reduce((s, i) => s + i.cost, 0);
-  const purchasedCount = MOVE_ITEMS.filter(i => purchased[i.id]).length;
+  const{projected,timeline}=calcProjection(savings,cfg,customFixed,fixedAmts);
+  const mood=getMood(projected,targetAmt);
+  const surplus=projected-targetAmt;
+  const remaining=targetAmt-savings;
+  const requiredPerMonth=monthsLeft>0?Math.round(remaining/monthsLeft):remaining;
+  const remainingItemsCost=MOVE_ITEMS.filter(i=>!purchased[i.id]).reduce((s,i)=>s+i.cost,0);
+  const purchasedCount=MOVE_ITEMS.filter(i=>purchased[i.id]).length;
 
-  const addExpense = async () => {
-    const amt = parseFloat(form.amount);
-    if (!amt || amt <= 0) return;
-    const entry = { id: Date.now(), amount: amt, cat: form.cat, desc: form.desc || form.cat, date: new Date().toISOString() };
-    const updated = { ...expenses, [cm]: [...cmExpenses, entry] };
+  const addExpense=async()=>{
+    const amt=parseFloat(form.amount);if(!amt||amt<=0)return;
+    const entry={id:Date.now(),amount:amt,cat:form.cat,desc:form.desc||form.cat,date:new Date().toISOString()};
+    const updated={...expenses,[cm]:[...cmExp,entry]};
     await saveExpenses(updated);
-    setToast(getTip(mood, totalVarARS + amt, form.cat));
-    setForm({ amount: "", cat: "general", desc: "" });
-    setTimeout(() => setToast(null), 3500);
+    setToast(getTip(mood,form.cat));
+    setForm({amount:"",cat:"general",desc:""});
+    setTimeout(()=>setToast(null),3500);
   };
-
-  const removeExpense = async (id) => {
-    const updated = { ...expenses, [cm]: cmExpenses.filter(e => e.id !== id) };
-    await saveExpenses(updated);
+  const removeExpense=async id=>{await saveExpenses({...expenses,[cm]:cmExp.filter(e=>e.id!==id)})};
+  const toggleFixed=async fid=>{const mp=fixedPaid[cm]||{};await saveFixedPaid({...fixedPaid,[cm]:{...mp,[fid]:!mp[fid]}})};
+  const updateFixedAmt=async(fid,val)=>{const ma=fixedAmts[cm]||{};await saveFixedAmts({...fixedAmts,[cm]:{...ma,[fid]:parseFloat(val)||0}})};
+  const togglePurchased=async iid=>{await savePurchased({...purchased,[iid]:!purchased[iid]})};
+  const addCustomFixed=async()=>{
+    if(!newFixed.name||!newFixed.amount)return;
+    const item={id:`custom-${Date.now()}`,name:newFixed.name,amount:parseFloat(newFixed.amount),variable:newFixed.variable};
+    const updated=[...customFixed,item];
+    await saveCustomFixed(updated);
+    setNewFixed({name:"",amount:"",variable:false});setAddFixedOpen(false);
   };
+  const removeCustomFixed=async id=>{await saveCustomFixed(customFixed.filter(f=>f.id!==id))};
 
-  const toggleFixed = async (fid) => {
-    const mp = fixedPaid[cm] || {};
-    const updated = { ...fixedPaid, [cm]: { ...mp, [fid]: !mp[fid] } };
-    await saveFixedPaid(updated);
-  };
-
-  const updateFixedAmt = async (fid, val) => {
-    const ma = fixedAmts[cm] || {};
-    const updated = { ...fixedAmts, [cm]: { ...ma, [fid]: parseFloat(val) || 0 } };
-    await saveFixedAmts(updated);
-  };
-
-  const togglePurchased = async (iid) => {
-    const updated = { ...purchased, [iid]: !purchased[iid] };
-    await savePurchased(updated);
-  };
-
-  const progressPct = Math.min(100, Math.round((savings / targetAmt) * 100));
-  const projPct = Math.min(100, Math.round((projected / targetAmt) * 100));
-
-  if (loading) return (
+  if(loading)return(
     <div className="flex items-center justify-center h-screen bg-gray-950 text-gray-300">
-      <div className="text-center"><div className="text-5xl mb-3 animate-pulse">🏠</div><p className="text-lg">Cargando...</p></div>
+      <div className="text-center"><div className="text-5xl mb-3 animate-pulse">🏠</div><p>Cargando...</p></div>
     </div>
   );
 
-  const Card = ({ children, className = "", style }) => (
-    <div className={`bg-gray-900 rounded-2xl p-4 ${className}`} style={style}>{children}</div>
-  );
-
-  const EditableField = ({ value, label, onSave, prefix = "$" }) => {
-    const [editing, setEditing] = useState(false);
-    const [input, setInput] = useState("");
-    return editing ? (
-      <input type="number" value={input} onChange={e => setInput(e.target.value)}
-        onBlur={() => { const v = parseFloat(input); if (v > 0) onSave(v); setEditing(false); }}
-        className="bg-gray-800 text-white rounded px-2 py-1 w-28 text-lg" autoFocus />
-    ) : (
-      <p className="text-white text-xl font-bold cursor-pointer" onClick={() => { setInput(String(value)); setEditing(true); }}>
-        {prefix}{value.toLocaleString("es-AR")} <span className="text-gray-600 text-sm">✏️</span>
-      </p>
-    );
-  };
-
-  const renderDashboard = () => (
+  const renderDashboard=()=>(
     <div className="space-y-4 pb-24">
-      <Card className="text-center py-6" style={{ background: mood.bg }}>
-        <div className="text-7xl mb-2" style={{filter:"drop-shadow(0 0 20px "+mood.color+"40)"}}>{mood.emoji}</div>
-        <p className="text-lg font-semibold" style={{ color: mood.color }}>{mood.text}</p>
-        <p className="text-gray-400 text-sm mt-1">{monthsLeft} meses para abril 2027</p>
+      {/* EMOJI HERO */}
+      <Card className="text-center py-8" style={{background:mood.bg}}>
+        <div className="text-8xl mb-3 emoji-glow" style={{"--gc":mood.color+"60"}}>{mood.emoji}</div>
+        <p className="text-xl font-bold" style={{color:mood.color}}>{mood.text}</p>
+        <p className="text-gray-400 text-sm mt-2">{monthsLeft} meses para abril 2027</p>
+        <div className="mt-4 inline-block bg-black/30 rounded-xl px-4 py-2">
+          <p className="text-xs text-gray-400">Necesitás ahorrar</p>
+          <p className="text-2xl font-bold" style={{color:requiredPerMonth<=700?"#4ade80":requiredPerMonth<=900?"#fbbf24":"#ef4444"}}>{fU(requiredPerMonth)}<span className="text-sm text-gray-400">/mes</span></p>
+        </div>
       </Card>
 
+      {/* FINANCIAL SUMMARY - tappable values */}
+      <Card>
+        <p className="text-gray-400 text-sm font-medium mb-3">Resumen financiero</p>
+        <div className="grid grid-cols-2 gap-4">
+          <Val value={savings} onSave={v=>saveSavings(v)} label="Ahorros actuales" format={fU}/>
+          <Val value={targetAmt} onSave={v=>saveCfg({...cfg,targetAmount:v})} label="Meta total" format={fU}/>
+          <div>
+            <p className="text-xs text-gray-500 mb-0.5">Faltan</p>
+            <p className="text-xl font-bold" style={{color:remaining>0?"#fca5a5":"#86efac"}}>{fU(Math.max(0,remaining))}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-0.5">Colchón proyectado</p>
+            <p className="text-xl font-bold" style={{color:surplus>=0?"#86efac":"#fca5a5"}}>{surplus>=0?"+":""}{fU(surplus)}</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* PROGRESS */}
       <Card>
         <div className="flex justify-between text-sm mb-2">
-          <span className="text-gray-400">Ahorro actual</span>
-          <span className="text-white font-bold">{fmtUSD(savings)}</span>
+          <span className="text-gray-400">Progreso</span>
+          <span className="text-white font-bold">{Math.min(100,Math.round(savings/targetAmt*100))}%</span>
         </div>
-        <div className="w-full bg-gray-800 rounded-full h-3 mb-1">
-          <div className="h-3 rounded-full transition-all" style={{ width: `${progressPct}%`, background: mood.color }} />
-        </div>
-        <div className="flex justify-between text-xs text-gray-500">
-          <span>{progressPct}%</span>
-          <span>Meta: {editTarget ? (
-            <input type="number" value={targetInput} onChange={e => setTargetInput(e.target.value)}
-              onBlur={() => { const v = parseFloat(targetInput); if (v > 0) saveConfig({ ...config, targetAmount: v }); setEditTarget(false); }}
-              className="bg-gray-800 text-white rounded px-1 w-20 text-xs inline" autoFocus />
-          ) : (
-            <span className="cursor-pointer" onClick={() => { setTargetInput(String(targetAmt)); setEditTarget(true); }}>
-              {fmtUSD(targetAmt)} ✏️
-            </span>
-          )}</span>
-        </div>
-        <div className="mt-4 flex justify-between text-sm">
-          <span className="text-gray-400">Proyección a abril</span>
-          <span className="font-bold" style={{ color: mood.color }}>{fmtUSD(projected)}</span>
-        </div>
-        <div className="w-full bg-gray-800 rounded-full h-3 mb-1 mt-2">
-          <div className="h-3 rounded-full transition-all" style={{ width: `${projPct}%`, background: surplus >= 0 ? "#4ade80" : "#ef4444" }} />
-        </div>
-        <p className="text-xs mt-1" style={{ color: surplus >= 0 ? "#86efac" : "#fca5a5" }}>
-          {surplus >= 0 ? `Colchón: ${fmtUSD(surplus)}` : `Te faltan: ${fmtUSD(Math.abs(surplus))}`}
-        </p>
-      </Card>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Card>
-          <p className="text-gray-500 text-xs">Gastado este mes</p>
-          <p className="text-white text-lg font-bold">{fmtARS(totalMonthARS)}</p>
-          <p className="text-gray-500 text-xs">≈ {fmtUSD(Math.round(totalMonthUSD))} USD</p>
-        </Card>
-        <Card>
-          <p className="text-gray-500 text-xs">Ahorro estimado mes</p>
-          <p className="text-lg font-bold" style={{ color: (config.salary - totalMonthUSD) > 600 ? "#4ade80" : "#fbbf24" }}>
-            {fmtUSD(Math.round(config.salary - totalMonthUSD))}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-gray-500 text-xs">Falta comprar</p>
-          <p className="text-white text-lg font-bold">{fmtUSD(remainingItemsCost)}</p>
-          <p className="text-gray-500 text-xs">{purchasedCount}/{MOVE_ITEMS.length} comprados</p>
-        </Card>
-        <Card>
-          <p className="text-gray-500 text-xs">Dólar</p>
-          <EditableField value={config.dollarRate} onSave={v => saveConfig({...config, dollarRate: v})} prefix="$" />
-        </Card>
-      </div>
-
-      <Card>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-gray-500 text-xs">Ahorros actuales (USD)</p>
-            <EditableField value={savings} onSave={v => saveSavings(v)} prefix="$" />
+        <div className="w-full bg-gray-800 rounded-full h-4 mb-3 overflow-hidden">
+          <div className="h-4 rounded-full transition-all relative" style={{width:`${Math.min(100,savings/targetAmt*100)}%`,background:`linear-gradient(90deg, ${mood.color}90, ${mood.color})`}}>
+            <div className="absolute inset-0 bg-white/10 rounded-full"/>
           </div>
-          <p className="text-gray-600 text-xs text-right">Tocá para<br/>actualizar</p>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-400">Proyección a abril</span>
+          <span className="font-bold" style={{color:mood.color}}>{fU(projected)}</span>
+        </div>
+        <div className="w-full bg-gray-800 rounded-full h-3 mt-2 overflow-hidden">
+          <div className="h-3 rounded-full transition-all" style={{width:`${Math.min(100,projected/targetAmt*100)}%`,background:surplus>=0?"#4ade80":"#ef4444"}}/>
         </div>
       </Card>
 
+      {/* CONFIG */}
       <Card>
-        <p className="text-gray-400 text-sm font-medium mb-3">Proyección mensual</p>
-        {(() => {
-          let running = savings;
-          const rows = [];
-          for (let i = 1; i <= monthsLeft; i++) {
-            const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-            let sal = config.salary;
-            if (d >= new Date(2027, 1, 1)) sal += config.febRaise;
-            const hasMono = MK(d) >= "2026-09";
-            const fix = hasMono ? totalFixedUSD : totalFixedUSD - (140000 / config.dollarRate);
-            const mk = MK(d);
-            const extraARS = EXTRAS.filter(e => e.month === mk).reduce((s,e) => s + e.amount, 0);
-            let monthSave = sal - fix - 250 - (extraARS / config.dollarRate);
-            if (d.getMonth() === 11 && d.getFullYear() === 2026) monthSave += config.endYearBonus;
-            running += monthSave;
-            const pct = Math.min(100, Math.round((running / targetAmt) * 100));
-            const isBonus = d.getMonth() === 11 && d.getFullYear() === 2026;
-            const hasExtra = extraARS > 0;
-            rows.push(
-              <div key={i} className="flex items-center gap-2 text-xs mb-1.5">
-                <span className="text-gray-500 w-14">{MONTH_NAMES[d.getMonth()]} {String(d.getFullYear()).slice(2)}</span>
-                <div className="flex-1 bg-gray-800 rounded-full h-2">
-                  <div className="h-2 rounded-full transition-all"
-                    style={{ width: `${pct}%`, background: running >= targetAmt ? "#4ade80" : "#fbbf24" }} />
-                </div>
-                <span className="text-gray-400 w-16 text-right">{fmtUSD(Math.round(running))}</span>
-                {isBonus && <span className="text-yellow-400">🎁</span>}
-                {hasExtra && <span className="text-red-400">🎁</span>}
+        <p className="text-gray-400 text-sm font-medium mb-3">Configuración</p>
+        <div className="grid grid-cols-2 gap-4">
+          <Val value={cfg.salary} onSave={v=>saveCfg({...cfg,salary:v})} label="Sueldo USD/mes" format={fU} size="lg"/>
+          <Val value={cfg.dollarRate} onSave={v=>saveCfg({...cfg,dollarRate:v})} label="Dólar (ARS)" format={fA} size="lg"/>
+          <Val value={cfg.endYearBonus} onSave={v=>saveCfg({...cfg,endYearBonus:v})} label="Bono fin de año" format={fU} size="lg"/>
+          <Val value={cfg.febRaise} onSave={v=>saveCfg({...cfg,febRaise:v})} label="Aumento Feb 27" format={fU} size="lg"/>
+        </div>
+      </Card>
+
+      {/* THIS MONTH */}
+      <Card>
+        <p className="text-gray-400 text-sm font-medium mb-2">{MN[now.getMonth()]} {now.getFullYear()} — Este mes</p>
+        <div className="grid grid-cols-3 gap-3">
+          <div><p className="text-xs text-gray-500">Fijos</p><p className="text-white font-bold">{fA(totalFixedARS)}</p><p className="text-gray-600 text-xs">≈{fU(totalFixedUSD)}</p></div>
+          <div><p className="text-xs text-gray-500">Variables</p><p className="text-white font-bold">{fA(totalVarARS)}</p></div>
+          <div><p className="text-xs text-gray-500">Total</p><p className="text-white font-bold">{fA(totalMonthARS)}</p><p className="text-gray-600 text-xs">≈{fU(totalMonthUSD)}</p></div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-gray-800">
+          <p className="text-xs text-gray-500">Ahorro estimado este mes</p>
+          <p className="text-lg font-bold" style={{color:cfg.salary-totalMonthUSD>600?"#4ade80":"#fbbf24"}}>{fU(Math.max(0,cfg.salary-totalMonthUSD))}</p>
+          <p className="text-xs text-gray-600 mt-1">Nota: tus ahorros actuales ya contemplan este mes</p>
+        </div>
+      </Card>
+
+      {/* TIMELINE */}
+      <Card>
+        <p className="text-gray-400 text-sm font-medium mb-3">Proyección mes a mes</p>
+        {timeline.map((m,i)=>(
+          <div key={i} className="mb-3 last:mb-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-gray-400 text-xs w-14 shrink-0">{m.label}</span>
+              <div className="flex-1 bg-gray-800 rounded-full h-2.5 overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{width:`${Math.min(100,m.accumulated/targetAmt*100)}%`,background:m.accumulated>=targetAmt?"#4ade80":"#fbbf24"}}/>
               </div>
-            );
-          }
-          return rows;
-        })()}
-        <div className="border-t border-gray-800 mt-2 pt-2 flex justify-between text-xs">
+              <span className="text-gray-300 text-xs w-16 text-right font-medium">{fU(m.accumulated)}</span>
+            </div>
+            <div className="flex gap-1 ml-16 flex-wrap">
+              {m.isBonus&&<span className="text-[10px] bg-yellow-900/50 text-yellow-400 px-1.5 py-0.5 rounded-full">🎁 Bono +{fU(cfg.endYearBonus)}</span>}
+              {m.hasExtra&&<span className="text-[10px] bg-red-900/50 text-red-400 px-1.5 py-0.5 rounded-full">🎁 {m.extraDesc}</span>}
+              {m.hasMonotributo&&i===0&&<span className="text-[10px] bg-orange-900/50 text-orange-400 px-1.5 py-0.5 rounded-full">📋 Monotributo</span>}
+              {m.hasRaise&&timeline[i-1]&&!timeline[i-1].hasRaise&&<span className="text-[10px] bg-green-900/50 text-green-400 px-1.5 py-0.5 rounded-full">📈 Aumento</span>}
+              <span className="text-[10px] text-gray-600">Ahorro: {fU(m.saved)}</span>
+            </div>
+          </div>
+        ))}
+        <div className="border-t border-gray-800 mt-3 pt-2 flex justify-between text-sm">
           <span className="text-gray-500">Meta</span>
-          <span className="text-green-400 font-medium">{fmtUSD(targetAmt)}</span>
+          <span className="text-green-400 font-medium">{fU(targetAmt)}</span>
+        </div>
+      </Card>
+
+      {/* MOVE PROGRESS */}
+      <Card>
+        <div className="flex justify-between items-center">
+          <div><p className="text-gray-500 text-xs">Falta comprar</p><p className="text-white text-xl font-bold">{fU(remainingItemsCost)}</p></div>
+          <div className="text-right"><p className="text-gray-500 text-xs">Comprados</p><p className="text-green-400 text-lg font-bold">{purchasedCount}/{MOVE_ITEMS.length}</p></div>
         </div>
       </Card>
     </div>
   );
 
-  const renderGastos = () => (
+  const renderGastos=()=>(
     <div className="space-y-4 pb-24">
       <Card>
-        <p className="text-gray-400 text-sm mb-1">{MONTH_NAMES[now.getMonth()]} {now.getFullYear()}</p>
-        <p className="text-white text-2xl font-bold">{fmtARS(totalMonthARS)}</p>
-        <p className="text-gray-500 text-xs">≈ {fmtUSD(Math.round(totalMonthUSD))} USD</p>
+        <p className="text-gray-400 text-sm mb-1">{MN[now.getMonth()]} {now.getFullYear()}</p>
+        <p className="text-white text-2xl font-bold">{fA(totalMonthARS)}</p>
+        <p className="text-gray-500 text-xs">≈ {fU(totalMonthUSD)} USD</p>
       </Card>
 
       <Card>
         <p className="text-gray-300 text-sm font-medium mb-3">Agregar gasto</p>
         <div className="flex gap-2 mb-3">
-          {[["uber","🚗 Uber"],["general","🛒 General"]].map(([v,l]) => (
-            <button key={v} onClick={() => setForm(f => ({...f, cat: v}))}
-              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${form.cat === v ? "bg-indigo-600 text-white" : "bg-gray-800 text-gray-400"}`}>
-              {l}
-            </button>
+          {[["uber","🚗 Uber"],["general","🛒 General"]].map(([v,l])=>(
+            <button key={v} onClick={()=>setForm(f=>({...f,cat:v}))}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${form.cat===v?"bg-indigo-600 text-white":"bg-gray-800 text-gray-400"}`}>{l}</button>
           ))}
         </div>
         <input type="number" inputMode="numeric" placeholder="Monto (ARS)" value={form.amount}
-          onChange={e => setForm(f => ({...f, amount: e.target.value}))}
-          className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mb-2 text-lg placeholder-gray-600 border-none outline-none" />
+          onChange={e=>setForm(f=>({...f,amount:e.target.value}))}
+          className="w-full bg-gray-800 text-white rounded-xl px-4 py-3 mb-2 text-lg placeholder-gray-600 border-none outline-none"/>
         <input type="text" placeholder="Descripción (opcional)" value={form.desc}
-          onChange={e => setForm(f => ({...f, desc: e.target.value}))}
-          className="w-full bg-gray-800 text-white rounded-xl px-4 py-2.5 mb-3 text-sm placeholder-gray-600 border-none outline-none" />
+          onChange={e=>setForm(f=>({...f,desc:e.target.value}))}
+          className="w-full bg-gray-800 text-white rounded-xl px-4 py-2.5 mb-3 text-sm placeholder-gray-600 border-none outline-none"/>
         <button onClick={addExpense}
-          className="w-full bg-indigo-600 active:bg-indigo-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-          Agregar
-        </button>
+          className="w-full bg-indigo-600 active:bg-indigo-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">Agregar</button>
       </Card>
 
-      {toast && (
-        <div className="bg-gray-800 border border-gray-700 rounded-xl p-3 text-sm text-gray-300 animate-pulse">{toast}</div>
-      )}
+      {toast&&<div className="bg-gray-800 border border-gray-700 rounded-xl p-3 text-sm text-gray-300">{toast}</div>}
 
+      {/* FIXED EXPENSES */}
       <Card>
-        <button onClick={() => setFixedOpen(!fixedOpen)}
-          className="w-full flex items-center justify-between text-gray-300 font-medium">
-          <span>📌 Gastos fijos ({fmtARS(totalFixedARS)})</span>
-          <span className="text-xl text-gray-500">{fixedOpen ? "▾" : "▸"}</span>
+        <button onClick={()=>setFixedOpen(!fixedOpen)} className="w-full flex items-center justify-between text-gray-300 font-medium">
+          <span>📌 Gastos fijos ({fA(totalFixedARS)})</span>
+          <span className="text-gray-500 transition-transform" style={{transform:fixedOpen?"rotate(180deg)":""}}>▾</span>
         </button>
-        {fixedOpen && (
+        {fixedOpen&&(
           <div className="mt-3 space-y-2">
-            {activeFixed.map(f => {
-              const paid = fixedPaid[cm]?.[f.id];
-              return (
+            {activeFixed.map(f=>{
+              const paid=fixedPaid[cm]?.[f.id];
+              const isCustom=f.id.startsWith("custom-");
+              return(
                 <div key={f.id} className="flex items-center gap-3 py-2 border-b border-gray-800 last:border-0">
-                  <button onClick={() => toggleFixed(f.id)}
-                    className={`w-6 h-6 rounded-md flex items-center justify-center text-xs transition-all flex-shrink-0 ${paid ? "bg-green-600" : "bg-gray-800 border border-gray-600"}`}>
-                    {paid && "✓"}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${paid ? "text-gray-500 line-through" : "text-gray-200"}`}>{f.name}</p>
-                  </div>
-                  {f.variable ? (
-                    <input type="number" inputMode="numeric" value={fixedAmts[cm]?.[f.id] ?? f.amount}
-                      onChange={e => updateFixedAmt(f.id, e.target.value)}
-                      className="bg-gray-800 text-white rounded px-2 py-1 w-28 text-sm text-right border-none outline-none" />
-                  ) : (
-                    <span className="text-gray-400 text-sm">{fmtARS(f.amount)}</span>
+                  <button onClick={()=>toggleFixed(f.id)}
+                    className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs transition-all shrink-0 ${paid?"bg-green-600 text-white":"bg-gray-800 border border-gray-600"}`}>
+                    {paid&&"✓"}</button>
+                  <p className={`flex-1 text-sm ${paid?"text-gray-500 line-through":"text-gray-200"}`}>{f.name}</p>
+                  {f.variable?(
+                    <input type="number" inputMode="numeric" value={fixedAmts[cm]?.[f.id]??f.amount}
+                      onChange={e=>updateFixedAmt(f.id,e.target.value)}
+                      className="bg-gray-800 text-white rounded-lg px-2 py-1 w-28 text-sm text-right border-none outline-none"/>
+                  ):(
+                    <span className="text-gray-400 text-sm">{fA(f.amount)}</span>
                   )}
+                  {isCustom&&<button onClick={()=>removeCustomFixed(f.id)} className="text-gray-600 active:text-red-400 text-xs p-1">✕</button>}
                 </div>
               );
             })}
             <div className="pt-2 flex justify-between text-sm">
-              <span className="text-gray-500">Total fijos en USD</span>
-              <span className="text-gray-300">≈ {fmtUSD(Math.round(totalFixedUSD))}</span>
+              <span className="text-gray-500">Total en USD</span>
+              <span className="text-gray-300">≈{fU(totalFixedUSD)}</span>
             </div>
+
+            {/* ADD CUSTOM FIXED */}
+            {addFixedOpen?(
+              <div className="pt-3 border-t border-gray-800 space-y-2 slide-up">
+                <input type="text" placeholder="Nombre del gasto" value={newFixed.name}
+                  onChange={e=>setNewFixed(f=>({...f,name:e.target.value}))}
+                  className="w-full bg-gray-800 text-white rounded-xl px-3 py-2 text-sm placeholder-gray-600 border-none outline-none"/>
+                <input type="number" inputMode="numeric" placeholder="Monto (ARS)" value={newFixed.amount}
+                  onChange={e=>setNewFixed(f=>({...f,amount:e.target.value}))}
+                  className="w-full bg-gray-800 text-white rounded-xl px-3 py-2 text-sm placeholder-gray-600 border-none outline-none"/>
+                <label className="flex items-center gap-2 text-sm text-gray-400">
+                  <input type="checkbox" checked={newFixed.variable} onChange={e=>setNewFixed(f=>({...f,variable:e.target.checked}))}
+                    className="rounded"/>
+                  Monto variable (cambia cada mes)
+                </label>
+                <div className="flex gap-2">
+                  <button onClick={addCustomFixed} className="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-sm font-medium">Agregar</button>
+                  <button onClick={()=>setAddFixedOpen(false)} className="px-4 text-gray-500 text-sm">Cancelar</button>
+                </div>
+              </div>
+            ):(
+              <button onClick={()=>setAddFixedOpen(true)}
+                className="w-full mt-2 py-2 border border-dashed border-gray-700 rounded-xl text-gray-500 text-sm active:border-indigo-500 active:text-indigo-400 transition-all">
+                + Agregar gasto fijo
+              </button>
+            )}
           </div>
         )}
       </Card>
 
-      {cmExpenses.length > 0 && (
+      {/* EXPENSE LIST */}
+      {cmExp.length>0&&(
         <Card>
           <p className="text-gray-400 text-sm font-medium mb-3">Gastos del mes</p>
-          <div className="space-y-2">
-            {[...cmExpenses].reverse().map(e => (
-              <div key={e.id} className="flex items-center justify-between py-1.5 border-b border-gray-800 last:border-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">{e.cat === "uber" ? "🚗" : "🛒"}</span>
-                  <div>
-                    <p className="text-gray-200 text-sm">{e.desc}</p>
-                    <p className="text-gray-600 text-xs">{new Date(e.date).toLocaleDateString("es-AR")}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-300 text-sm">{fmtARS(e.amount)}</span>
-                  <button onClick={() => removeExpense(e.id)} className="text-gray-600 active:text-red-400 text-xs p-1">✕</button>
+          {[...cmExp].reverse().map(e=>(
+            <div key={e.id} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{e.cat==="uber"?"🚗":"🛒"}</span>
+                <div>
+                  <p className="text-gray-200 text-sm">{e.desc}</p>
+                  <p className="text-gray-600 text-xs">{new Date(e.date).toLocaleDateString("es-AR")}</p>
                 </div>
               </div>
-            ))}
-          </div>
-          <div className="mt-3 pt-2 border-t border-gray-800 space-y-1">
-            {["uber","general"].map(cat => {
-              const total = cmExpenses.filter(e => e.cat === cat).reduce((s,e) => s + e.amount, 0);
-              if (!total) return null;
-              return (
-                <div key={cat} className="flex justify-between text-xs">
-                  <span className="text-gray-500">{cat === "uber" ? "🚗 Uber" : "🛒 General"}</span>
-                  <span className="text-gray-400">{fmtARS(total)}</span>
-                </div>
-              );
-            })}
-            <div className="flex justify-between text-sm font-medium pt-1">
-              <span className="text-gray-400">Total variable</span>
-              <span className="text-white">{fmtARS(totalVarARS)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-300 text-sm">{fA(e.amount)}</span>
+                <button onClick={()=>removeExpense(e.id)} className="text-gray-600 active:text-red-400 p-1 text-xs">✕</button>
+              </div>
             </div>
+          ))}
+          <div className="mt-3 pt-2 border-t border-gray-800">
+            {["uber","general"].map(cat=>{
+              const t=cmExp.filter(e=>e.cat===cat).reduce((s,e)=>s+e.amount,0);
+              if(!t)return null;
+              return <div key={cat} className="flex justify-between text-xs py-0.5"><span className="text-gray-500">{cat==="uber"?"🚗 Uber":"🛒 General"}</span><span className="text-gray-400">{fA(t)}</span></div>;
+            })}
+            <div className="flex justify-between text-sm font-medium pt-1"><span className="text-gray-400">Total variable</span><span className="text-white">{fA(totalVarARS)}</span></div>
           </div>
         </Card>
       )}
     </div>
   );
 
-  const renderMudanza = () => {
-    const rooms = [...new Set(MOVE_ITEMS.map(i => i.room))];
-    return (
+  const renderMudanza=()=>{
+    const rooms=[...new Set(MOVE_ITEMS.map(i=>i.room))];
+    return(
       <div className="space-y-4 pb-24">
         <Card>
           <div className="flex justify-between items-center">
-            <div>
-              <p className="text-gray-500 text-xs">Falta comprar</p>
-              <p className="text-white text-2xl font-bold">{fmtUSD(remainingItemsCost)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-gray-500 text-xs">Progreso</p>
-              <p className="text-green-400 text-lg font-bold">{purchasedCount}/{MOVE_ITEMS.length}</p>
-            </div>
+            <div><p className="text-gray-500 text-xs">Falta comprar</p><p className="text-white text-2xl font-bold">{fU(remainingItemsCost)}</p></div>
+            <div className="text-right"><p className="text-gray-500 text-xs">Progreso</p><p className="text-green-400 text-lg font-bold">{purchasedCount}/{MOVE_ITEMS.length}</p></div>
           </div>
           <div className="w-full bg-gray-800 rounded-full h-2 mt-3">
-            <div className="h-2 rounded-full bg-green-500 transition-all"
-              style={{ width: `${Math.round((purchasedCount / MOVE_ITEMS.length) * 100)}%` }} />
+            <div className="h-2 rounded-full bg-green-500 transition-all" style={{width:`${Math.round(purchasedCount/MOVE_ITEMS.length*100)}%`}}/>
           </div>
         </Card>
-
         <Card>
           <p className="text-gray-400 text-sm font-medium mb-2">Por prioridad (pendientes)</p>
-          {PRIORITY_ORDER.map(p => {
-            const items = MOVE_ITEMS.filter(i => i.p === p && !purchased[i.id]);
-            const total = items.reduce((s, i) => s + i.cost, 0);
-            if (!total) return null;
-            return (
-              <div key={p} className="flex justify-between text-sm py-1">
-                <span className="text-gray-400">{PRIORITY_LABELS[p]}</span>
-                <span className="text-gray-200">{fmtUSD(total)}</span>
-              </div>
-            );
+          {PO.map(p=>{
+            const items=MOVE_ITEMS.filter(i=>i.p===p&&!purchased[i.id]);
+            const t=items.reduce((s,i)=>s+i.cost,0);
+            if(!t)return null;
+            return <div key={p} className="flex justify-between text-sm py-1"><span className="text-gray-400">{PL[p]}</span><span className="text-gray-200">{fU(t)}</span></div>;
           })}
         </Card>
-
-        {rooms.map(room => {
-          const items = MOVE_ITEMS.filter(i => i.room === room);
-          const done = items.filter(i => purchased[i.id]);
-          return (
+        {rooms.map(room=>{
+          const items=MOVE_ITEMS.filter(i=>i.room===room);
+          const done=items.filter(i=>purchased[i.id]);
+          return(
             <Card key={room}>
               <div className="flex justify-between items-center mb-3">
                 <p className="text-gray-200 font-medium">{room}</p>
                 <span className="text-xs text-gray-500">{done.length}/{items.length}</span>
               </div>
-              <div className="space-y-1.5">
-                {items.sort((a,b) => (purchased[a.id]?1:0)-(purchased[b.id]?1:0)).map(item => (
-                  <div key={item.id} className="flex items-center gap-3 py-1.5">
-                    <button onClick={() => togglePurchased(item.id)}
-                      className={`w-6 h-6 rounded flex items-center justify-center text-xs flex-shrink-0 transition-all ${purchased[item.id] ? "bg-green-600" : "bg-gray-800 border border-gray-600"}`}>
-                      {purchased[item.id] && "✓"}
-                    </button>
-                    <span className={`flex-1 text-sm ${purchased[item.id] ? "text-gray-600 line-through" : "text-gray-200"}`}>
-                      {item.name}
-                    </span>
-                    <span className={`text-sm ${purchased[item.id] ? "text-gray-700" : "text-gray-400"}`}>{fmtUSD(item.cost)}</span>
-                    <span className="text-xs">{item.p === "indispensable" ? "🟠" : item.p === "ultimo" ? "🟧" : item.p === "inmobiliaria" ? "🔴" : "🟢"}</span>
-                  </div>
-                ))}
-              </div>
+              {items.sort((a,b)=>(purchased[a.id]?1:0)-(purchased[b.id]?1:0)).map(item=>(
+                <div key={item.id} className="flex items-center gap-3 py-1.5">
+                  <button onClick={()=>togglePurchased(item.id)}
+                    className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs shrink-0 transition-all ${purchased[item.id]?"bg-green-600":"bg-gray-800 border border-gray-600"}`}>
+                    {purchased[item.id]&&"✓"}</button>
+                  <span className={`flex-1 text-sm ${purchased[item.id]?"text-gray-600 line-through":"text-gray-200"}`}>{item.name}</span>
+                  <span className={`text-sm ${purchased[item.id]?"text-gray-700":"text-gray-400"}`}>{fU(item.cost)}</span>
+                  <span className="text-xs">{item.p==="indispensable"?"🟠":item.p==="ultimo"?"🟧":item.p==="inmobiliaria"?"🔴":"🟢"}</span>
+                </div>
+              ))}
             </Card>
           );
         })}
@@ -578,35 +552,27 @@ function App() {
     );
   };
 
-  const tabs = [
-    { icon: "📊", label: "Dashboard" },
-    { icon: "💸", label: "Gastos" },
-    { icon: "📦", label: "Mudanza" },
-  ];
+  const tabs=[{icon:"📊",label:"Dashboard"},{icon:"💸",label:"Gastos"},{icon:"📦",label:"Mudanza"}];
 
-  return (
+  return(
     <div className="min-h-screen bg-gray-950 text-white max-w-lg mx-auto">
       <div className="sticky top-0 z-30 bg-gray-950/95 backdrop-blur-sm border-b border-gray-800 px-4 py-3">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold">🏠 Mudanza 2027</h1>
-            <p className="text-xs text-gray-500">{monthsLeft} meses para abril</p>
-          </div>
+          <div><h1 className="text-lg font-bold">🏠 Mudanza 2027</h1><p className="text-xs text-gray-500">{monthsLeft} meses para abril</p></div>
           <div className="text-3xl">{mood.emoji}</div>
         </div>
       </div>
       <div className="px-4 pt-4">
-        {tab === 0 && renderDashboard()}
-        {tab === 1 && renderGastos()}
-        {tab === 2 && renderMudanza()}
+        {tab===0&&renderDashboard()}
+        {tab===1&&renderGastos()}
+        {tab===2&&renderMudanza()}
       </div>
       <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 z-30">
         <div className="flex max-w-lg mx-auto">
-          {tabs.map((t, i) => (
-            <button key={i} onClick={() => setTab(i)}
-              className={`flex-1 py-3 flex flex-col items-center gap-0.5 transition-all ${tab === i ? "text-indigo-400" : "text-gray-500"}`}>
-              <span className="text-xl">{t.icon}</span>
-              <span className="text-xs">{t.label}</span>
+          {tabs.map((t,i)=>(
+            <button key={i} onClick={()=>setTab(i)}
+              className={`flex-1 py-3 flex flex-col items-center gap-0.5 transition-all ${tab===i?"text-indigo-400":"text-gray-500"}`}>
+              <span className="text-xl">{t.icon}</span><span className="text-xs">{t.label}</span>
             </button>
           ))}
         </div>
@@ -615,8 +581,7 @@ function App() {
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
