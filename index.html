@@ -129,12 +129,15 @@ function calcProjection(savings,cfg,customFixed,fixedAmts,customEvents){
   return{projected:Math.round(total),timeline};
 }
 
-function getMood(projected,target){
+const DEFAULT_THRESHOLDS={t5:1.20,t4:1.05,t3:0.95,t2:0.85};
+
+function getMood(projected,target,th){
+  th=th||DEFAULT_THRESHOLDS;
   const r=projected/target;
-  if(r>=1.20)return{emoji:"😎",text:"Vas sobrado, podés darte algún gusto",color:"#4ade80",bg:"#052e16",level:5};
-  if(r>=1.05)return{emoji:"😊",text:"Bien encaminado, no aflojes",color:"#86efac",bg:"#052e16",level:4};
-  if(r>=0.95)return{emoji:"😐",text:"Vas justo, cada gasto cuenta",color:"#fbbf24",bg:"#422006",level:3};
-  if(r>=0.85)return{emoji:"😟",text:"Estás apretado, recortá lo que puedas",color:"#fb923c",bg:"#431407",level:2};
+  if(r>=th.t5)return{emoji:"😎",text:"Vas sobrado, podés darte algún gusto",color:"#4ade80",bg:"#052e16",level:5};
+  if(r>=th.t4)return{emoji:"😊",text:"Bien encaminado, no aflojes",color:"#86efac",bg:"#052e16",level:4};
+  if(r>=th.t3)return{emoji:"😐",text:"Vas justo, cada gasto cuenta",color:"#fbbf24",bg:"#422006",level:3};
+  if(r>=th.t2)return{emoji:"😟",text:"Estás apretado, recortá lo que puedas",color:"#fb923c",bg:"#431407",level:2};
   return{emoji:"😡",text:"Así no llegás a abril, hay que frenar",color:"#ef4444",bg:"#450a0a",level:1};
 }
 
@@ -202,6 +205,9 @@ function App(){
   const[addFixedOpen,setAddFixedOpen]=useState(false);
   const[newFixed,setNewFixed]=useState({name:"",amount:"",variable:false});
   const[newEvent,setNewEvent]=useState({month:"",desc:"",amount:"",type:"gasto"});
+  const[showMoodDetail,setShowMoodDetail]=useState(false);
+  const[editThresholds,setEditThresholds]=useState(false);
+  const[thInput,setThInput]=useState({});
 
   useEffect(()=>{(async()=>{
     const all=await db.load();
@@ -240,7 +246,9 @@ function App(){
 
   const{projected,timeline}=calcProjection(savings,cfg,customFixed,fixedAmts,customEvents);
   const upcomingMonths=timeline.map(t=>({key:t.month,label:t.label}));
-  const mood=getMood(projected,targetAmt);
+  const thresholds=cfg.moodThresholds||DEFAULT_THRESHOLDS;
+  const mood=getMood(projected,targetAmt,thresholds);
+  const moodRatio=projected/targetAmt;
   const surplus=projected-targetAmt;
   const remaining=targetAmt-savings;
   const requiredPerMonth=monthsLeft>0?Math.round(remaining/monthsLeft):remaining;
@@ -291,7 +299,7 @@ function App(){
   const renderDashboard=()=>(
     <div className="space-y-4 pb-24">
       {/* EMOJI HERO */}
-      <Card className="text-center py-8" style={{background:mood.bg}}>
+      <Card className="text-center py-8 cursor-pointer active:scale-[0.99] transition-transform" style={{background:mood.bg}} onClick={()=>setShowMoodDetail(true)}>
         <div className="text-8xl mb-3 emoji-glow" style={{"--gc":mood.color+"60"}}>{mood.emoji}</div>
         <p className="text-xl font-bold" style={{color:mood.color}}>{mood.text}</p>
         <p className="text-gray-400 text-sm mt-2">{monthsLeft} meses para abril 2027</p>
@@ -299,7 +307,66 @@ function App(){
           <p className="text-xs text-gray-400">Necesitás ahorrar</p>
           <p className="text-2xl font-bold" style={{color:requiredPerMonth<=700?"#4ade80":requiredPerMonth<=900?"#fbbf24":"#ef4444"}}>{fU(requiredPerMonth)}<span className="text-sm text-gray-400">/mes</span></p>
         </div>
+        <p className="text-gray-600 text-xs mt-3">Tocá para ver el cálculo →</p>
       </Card>
+
+      {/* MOOD DETAIL MODAL */}
+      {showMoodDetail&&(
+        <div className="fixed inset-0 bg-black/70 z-40 flex items-end" onClick={()=>setShowMoodDetail(false)}>
+          <div className="bg-gray-900 rounded-t-3xl w-full max-w-lg mx-auto p-5 slide-up max-h-[85vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <p className="text-white font-bold text-lg">Cómo se calcula la cara</p>
+              <button onClick={()=>setShowMoodDetail(false)} className="text-gray-500 text-xl px-2">✕</button>
+            </div>
+
+            <div className="bg-gray-800 rounded-2xl p-4 mb-4 space-y-2">
+              <div className="flex justify-between text-sm"><span className="text-gray-400">Ahorros actuales</span><span className="text-white font-medium">{fU(savings)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-400">+ Ahorro proyectado ({monthsLeft} meses)</span><span className="text-white font-medium">{fU(projected-savings)}</span></div>
+              <div className="border-t border-gray-700 pt-2 flex justify-between text-sm font-bold"><span className="text-gray-300">= Proyección total a abril</span><span style={{color:mood.color}}>{fU(projected)}</span></div>
+              <div className="flex justify-between text-sm pt-2"><span className="text-gray-400">÷ Meta</span><span className="text-white font-medium">{fU(targetAmt)}</span></div>
+              <div className="border-t border-gray-700 pt-2 flex justify-between text-sm font-bold"><span className="text-gray-300">= Ratio</span><span style={{color:mood.color}}>{(moodRatio*100).toFixed(0)}%</span></div>
+            </div>
+
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-gray-300 text-sm font-medium">Niveles (editables)</p>
+              {!editThresholds&&<button onClick={()=>{setThInput({t5:String(Math.round(thresholds.t5*100)),t4:String(Math.round(thresholds.t4*100)),t3:String(Math.round(thresholds.t3*100)),t2:String(Math.round(thresholds.t2*100))});setEditThresholds(true)}} className="text-indigo-400 text-xs font-medium">Editar</button>}
+            </div>
+
+            {editThresholds?(
+              <div className="space-y-2 slide-up">
+                {[["t5","😎 Sobrado, desde"],["t4","😊 Bien, desde"],["t3","😐 Justo, desde"],["t2","😟 Apretado, desde"]].map(([k,l])=>(
+                  <div key={k} className="flex items-center justify-between bg-gray-800 rounded-xl px-3 py-2">
+                    <span className="text-sm text-gray-300">{l}</span>
+                    <div className="flex items-center gap-1">
+                      <input type="number" value={thInput[k]} onChange={e=>setThInput(f=>({...f,[k]:e.target.value}))}
+                        className="w-16 bg-gray-700 text-white rounded-lg px-2 py-1 text-sm text-right border-none outline-none"/>
+                      <span className="text-gray-500 text-sm">%</span>
+                    </div>
+                  </div>
+                ))}
+                <p className="text-gray-600 text-xs">Por debajo del último nivel es 😡. Más exigente = números más altos.</p>
+                <div className="flex gap-2 pt-1">
+                  <button onClick={async()=>{
+                    const nt={t5:parseFloat(thInput.t5)/100,t4:parseFloat(thInput.t4)/100,t3:parseFloat(thInput.t3)/100,t2:parseFloat(thInput.t2)/100};
+                    await saveCfg({...cfg,moodThresholds:nt});
+                    setEditThresholds(false);
+                  }} className="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-sm font-medium">Guardar</button>
+                  <button onClick={()=>setEditThresholds(false)} className="px-4 text-gray-500 text-sm">Cancelar</button>
+                </div>
+                <button onClick={async()=>{await saveCfg({...cfg,moodThresholds:DEFAULT_THRESHOLDS});setEditThresholds(false)}} className="w-full text-gray-500 text-xs py-1">Restaurar valores por defecto</button>
+              </div>
+            ):(
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-sm py-1"><span className="text-gray-400">😎 Sobrado</span><span className="text-gray-300">≥ {Math.round(thresholds.t5*100)}%</span></div>
+                <div className="flex justify-between text-sm py-1"><span className="text-gray-400">😊 Bien</span><span className="text-gray-300">≥ {Math.round(thresholds.t4*100)}%</span></div>
+                <div className="flex justify-between text-sm py-1"><span className="text-gray-400">😐 Justo</span><span className="text-gray-300">≥ {Math.round(thresholds.t3*100)}%</span></div>
+                <div className="flex justify-between text-sm py-1"><span className="text-gray-400">😟 Apretado</span><span className="text-gray-300">≥ {Math.round(thresholds.t2*100)}%</span></div>
+                <div className="flex justify-between text-sm py-1"><span className="text-gray-400">😡 No llegás</span><span className="text-gray-300">&lt; {Math.round(thresholds.t2*100)}%</span></div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* FINANCIAL SUMMARY - tappable values */}
       <Card>
